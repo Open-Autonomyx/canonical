@@ -285,6 +285,58 @@ fn revoking_a_parent_invalidates_its_delegations() {
 }
 
 #[test]
+fn subtree_grant_does_not_cover_sibling_paths() {
+    let (alice, mut bob, _echo) = echo_core();
+    // a grant for the "tool/*" subtree must not reach a sibling like "toolbox/secret"
+    let grant = bob.share(alice.id(), "tool/*", "invoke", vec![]);
+    let sibling = bob.resource("toolbox/secret");
+    let msg = invoke(
+        alice.signer(),
+        bob.id(),
+        &sibling,
+        Json::str("x"),
+        Some(grant.clone()),
+    );
+    assert!(!bob.handle(&msg).decision.ok);
+
+    // but it does cover a real child under "tool/"
+    let child = bob.resource("tool/echo");
+    let msg = invoke(
+        alice.signer(),
+        bob.id(),
+        &child,
+        Json::str("ok"),
+        Some(grant),
+    );
+    assert!(bob.handle(&msg).decision.ok);
+}
+
+#[test]
+fn extreme_timestamp_is_denied_not_panicked() {
+    let (alice, mut bob, echo) = echo_core();
+    let grant = bob.share(alice.id(), "tool/echo", "invoke", vec![]);
+    // a signed but absurd issuedAt must fail closed, never overflow/panic the edge
+    let msg = compose(
+        alice.signer(),
+        ComposeParams {
+            to: bob.id(),
+            action: "invoke",
+            resource: &echo,
+            payload: Json::str("x"),
+            grant: Some(grant),
+        },
+        i64::MIN,
+    )
+    .unwrap();
+    let out = bob.handle(&msg);
+    assert!(!out.decision.ok);
+    assert_eq!(
+        out.decision.reason.as_deref(),
+        Some("message outside freshness window")
+    );
+}
+
+#[test]
 fn contract_not_rooted_at_provider_is_rejected() {
     let owner = Signer::generate().unwrap();
     let stranger = Signer::generate().unwrap();

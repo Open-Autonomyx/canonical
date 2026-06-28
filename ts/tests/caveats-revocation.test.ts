@@ -38,6 +38,19 @@ test("revoking a contract denies further use", async () => {
   assert.equal(out.decision.reason, "contract revoked");
 });
 
+test("an empty caveats array is normalized away (matches the Rust core)", async () => {
+  const owner = await generateSigner();
+  const sub = await generateSigner();
+  const r = makeResource(owner.id, "x");
+  // Passing [] must produce the same signed bytes as passing nothing, so a
+  // no-caveat grant verifies on a Rust edge (which never emits an empty array).
+  const withEmpty = await issueGrant(owner, { subject: sub.id, action: "invoke", resource: r, caveats: [] }, 1000);
+  const without = await issueGrant(owner, { subject: sub.id, action: "invoke", resource: r }, 1000);
+  assert.equal(withEmpty.sig, without.sig);
+  assert.equal((await verifyGrant(withEmpty, owner.id, 1000)).ok, true);
+  assert.equal(withEmpty.caveats, undefined);
+});
+
 test("revoking a parent invalidates its delegations", async () => {
   const { alice, bob, echo } = await echoSetup();
   const carol = await Core.create();

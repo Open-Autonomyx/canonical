@@ -24,8 +24,11 @@ pub fn path_subsumes(parent: &str, child: &str) -> bool {
     if parent == child || parent == "*" {
         return true;
     }
-    if let Some(prefix) = parent.strip_suffix("/*") {
-        return child.starts_with(prefix) && child.len() > prefix.len();
+    if parent.ends_with("/*") {
+        // "a/b/*" -> the child must stay within "a/b/" (keep the separator, so
+        // "tool/*" does not also cover a sibling like "toolbox/secret").
+        let prefix = &parent[..parent.len() - 1];
+        return child.starts_with(prefix);
     }
     false
 }

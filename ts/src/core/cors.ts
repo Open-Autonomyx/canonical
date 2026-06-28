@@ -78,7 +78,9 @@ export async function issueGrant(owner: Signer, params: IssueParams, now: number
     subject: params.subject,
     action: params.action,
     resource: params.resource,
-    caveats: params.caveats,
+    // Omit empty/absent caveats so the signed bytes match the Rust core, which
+    // never emits an empty caveat array. Keeps the two cores one trust domain.
+    caveats: params.caveats && params.caveats.length > 0 ? params.caveats : undefined,
     issuedAt: now,
     proof: params.proof,
   };

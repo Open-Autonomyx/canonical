@@ -75,8 +75,9 @@ impl Edge {
         if resource_owner(&msg.resource) != self.owner_id {
             return Decision::deny("resource not owned by this edge");
         }
-        // 3. freshness
-        if (now - msg.issued_at).abs() > self.window_ms {
+        // 3. freshness — abs_diff never overflows, so a malformed signed
+        //    timestamp (e.g. i64::MIN) fails closed instead of panicking.
+        if now.abs_diff(msg.issued_at) > self.window_ms.unsigned_abs() {
             return Decision::deny("message outside freshness window");
         }
         // 4. replay
